@@ -8,34 +8,6 @@
 
 DCPU16::DCPU16()
 {
-    for(int i = 0; i < 16; i++)
-        op_cycles[i] = 0;
-
-    for(int i = 0; i < 0x20; i++)
-        operand_cycles[i] = 0;
-
-    op_cycles[SET] = 1;
-    op_cycles[ADD] = 2;
-    op_cycles[SUB] = 2;
-    op_cycles[MUL] = 2;
-    op_cycles[DIV] = 3;
-    op_cycles[MOD] = 3;
-    op_cycles[SHL] = 2;
-    op_cycles[SHR] = 2;
-    op_cycles[AND] = 1;
-    op_cycles[BOR] = 1;
-    op_cycles[XOR] = 1;
-    op_cycles[IFE] = 2;
-    op_cycles[IFN] = 2;
-    op_cycles[IFG] = 2;
-    op_cycles[IFB] = 2;
-
-    for(int i = 0x10; i <= 0x17; i++)
-        operand_cycles[i] = 1;
-
-    operand_cycles[0x1E] = 1;
-    operand_cycles[0x1F] = 1;
-
     reset();
 }
 
@@ -45,9 +17,8 @@ void DCPU16::reset()
     sp = 0;
     overflow = 0;
     clock = 0;
-    last_instruction = 0;
+    //last_instruction = 0; //TODO initialize last instruction or make sure it has a constructor
     error = ERROR_NONE;
-    skip_next = false;
 
     std::fill(mem, mem+MEMORY_SIZE, 0);
     std::fill(mem_flags, mem_flags+MEMORY_SIZE, 0);
@@ -65,24 +36,20 @@ void DCPU16::tick()
     if(error)
         return;
 
-    uint16_t inst = mem[pc++];
-    last_instruction = inst;
+    InstructionData instruction = nextInstruction();
+    last_instruction = instruction;
 
-    uint16_t op = (inst >> INST_OP_SHIFT) & INST_OP_MASK;
-    uint16_t va = (inst >> INST_VA_SHIFT) & INST_VA_MASK;
-    uint16_t vb = (inst >> INST_VB_SHIFT) & INST_VB_MASK;
+    uint16_t op    = instruction.op;
+    uint16_t oa    = instruction.oa;
+    uint16_t a     = instruction.a;
+    uint16_t b     = instruction.b;
+    uint16_t *aptr = instruction.aptr;
 
-    uint16_t a, *aptr, b, *bptr;
-    processOperand(va, &aptr, &a);
-    processOperand(vb, &bptr, &b);
+    /* true if a conditional fails. */
+    bool skip_next = false;
 
-    if(skip_next)
-    {
-        skip_next = false;
-        return;
-    }
-
-    int32_t a32 = a, b32 = b, r32 = 0;
+    /* signed 32 bit values to perform intermediate operation with. */
+    int64_t a64 = a, b64 = b;
 
     switch(op)
     {
@@ -91,69 +58,45 @@ void DCPU16::tick()
         break;
 
     case ADD:
-        r32 = a32 + b32;
-        //if(r32 > UINT16_MAX) //FIXME why isn't UINT16_MAX defined included?
-        if(r32 > 0xFFFF)
-        {
-            writePtr(aptr, r32 % 0xFFFF);
-            overflow = 0x0001;
-        }
-        else
-        {
-            writePtr(aptr, r32);
-            overflow = 0x0000;
-        }
-    break;
+        writePtr(aptr, a + b);
+        overflow = a64 + b64 > 0xFFFF ? 0x0001 : 0x0000;
+        break;
 
     case SUB:
-        r32 = a32 - b32;
-        if(r32 < 0)
-        {
-            writePtr(aptr, r32 + 0xFFFF);
-            overflow = 0xFFFF;
-        }
-        else
-        {
-            writePtr(aptr, r32);
-            overflow = 0x0000;
-        }
+        writePtr(aptr, a - b);
+        overflow = a64 - b64 < 0 ? 0xFFFF : 0x0000;
         break;
 
     case MUL:
-        r32 = a32 * b32;
-        writePtr(aptr, r32);
-        overflow = (r32 >> 16) & 0xFFFF;
+        writePtr(aptr, a * b);
+        overflow = ((a64 * b64) >> 16) & 0xFFFF;
         break;
 
     case DIV:
         if(b == 0)
         {
             writePtr(aptr, 0);
-            overflow = 0;
+            overflow = 0x0000;
         }
         else
         {
-            r32 = a32 / b32;
-            writePtr(aptr, r32);
-            overflow = ((a32 << 16) / b32) & 0xFFFF;
+            writePtr(aptr, a / b);
+            overflow = ((a64 << 16) / b64) & 0xFFFF;
         }
         break;
 
     case MOD:
-        if(b32 == 0)
-            writePtr(aptr, 0);
-        else
-            writePtr(aptr, a % b);
+            writePtr(aptr, b == 0 ? 0 : a % b);
         break;
 
     case SHL:
         writePtr(aptr, a << b);
-        overflow = ((a32 << b32) >> 16) & 0xFFFF;
+        overflow = ((a64 << b64) >> 16) & 0xFFFF;
         break;
 
     case SHR:
         writePtr(aptr, a >> b);
-        overflow = ((a32 << 16) >> b32) & 0xFFFF;
+        overflow = ((a64 << 16) >> b64) & 0xFFFF;
         break;
 
     case AND:
@@ -185,7 +128,7 @@ void DCPU16::tick()
         break;
 
     case EXT:
-        switch(va)
+        switch(oa)
         {
         case JSR:
             mem[--sp] = pc;
@@ -199,44 +142,163 @@ void DCPU16::tick()
         break;
     }
 
-    //TODO cycles for ext instructions
-    clock += op_cycles[op];
-    //TODO don't add cycles when a has an extended opcode in it
-    if(va < 0x20) clock += operand_cycles[va];
-    if(vb < 0x20) clock += operand_cycles[vb];
-    if(skip_next) clock += 2;
+    clock += instruction.cycles;
+
+    if(skip_next)
+    {
+        nextInstruction();
+        clock += 2;
+    }
+}
+
+/*
+ * Reads the next instruction, processes its operands, and advances the program
+ * counter.
+ *
+ * Note: No cycles are added.
+ */
+InstructionData DCPU16::nextInstruction()
+{
+    InstructionData data;
+
+    data.instruction_address = pc;
+    data.instruction         = mem[pc++];
+    data.cycles              = getInstructionCycles(data.instruction);
+    splitInstruction(data.instruction, &data.op, &data.oa, &data.ob);
+
+
+    if(data.op != EXT)
+    {
+        processOperand(data.oa, &data.aptr, &data.a);
+        processOperand(data.ob, &data.bptr, &data.b);
+    }
+    else
+    {
+        data.a = 0;
+        data.aptr = NULL;
+        processOperand(data.ob, &data.bptr, &data.b);
+    }
+
+    return data;
+}
+
+void DCPU16::splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob)
+{
+    *op = (instruction >> INST_OP_SHIFT) & INST_OP_MASK;
+    *oa = (instruction >> INST_VA_SHIFT) & INST_VA_MASK;
+    *ob = (instruction >> INST_VB_SHIFT) & INST_VB_MASK;
 }
 
 void DCPU16::processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value)
 {
+    /*
+     * When indexing registers it's possible to compute the index as (operand %
+     * NUM_REGISTERS). This works since register indices are aligned to
+     * NUM_REGISTERS boundaries.
+     */
+
     *ptr = NULL;
 
-    if(operand <= 0x07) //TODO check overflow works correctly here
+    if(operand <= OPERAND_REGISTER) //TODO check overflow works correctly here
         *ptr = reg + operand;
-    else if(operand <= 0x0F)
-        *ptr = mem + reg[operand - 0x8];
-    else if(operand <= 0x17)
-        *ptr = mem + mem[pc++] + reg[operand - 0x10];
-    else if(0x18 == operand)
+    else if(operand <= OPERAND_REGISTER_PTR)
+        *ptr = mem + reg[operand % NUM_REGISTERS];
+    else if(operand <= OPERAND_REGISTER_NEXT_WORD_PTR)
+        *ptr = mem + mem[pc++] + reg[operand % NUM_REGISTERS];
+    else if(OPERAND_POP == operand)
         *ptr = mem + sp++;
-    else if(0x19 == operand)
+    else if(OPERAND_PEEK == operand)
         *ptr = mem + sp;
-    else if(0x1a == operand)
+    else if(OPERAND_PUSH == operand)
         *ptr = mem + --sp;
-    else if(0x1b == operand)
+    else if(OPERAND_SP == operand)
         *ptr = &sp;
-    else if(0x1c == operand)
+    else if(OPERAND_PC == operand)
         *ptr = &pc;
-    else if(0x1d == operand)
+    else if(OPERAND_OVERFLOW == operand)
         *ptr = &overflow;
-    else if(0x1e == operand)
+    else if(OPERAND_NEXT_WORD_PTR == operand)
         *ptr = mem + mem[pc++];
-    else if(0x1f == operand)
+    else if(OPERAND_NEXT_WORD_LITERAL == operand)
         *ptr = mem + pc++;
     else
-        *value = operand - 0x20;
+        *value = operand - OPERAND_LITERAL;
 
     if(*ptr) *value = **ptr;
+}
+
+/*
+ * Gets the total cycle count for an instruction. This includes the cycles
+ * required by the the instruction's operation and operands.
+ *
+ * @param instruction Instruction to get the cycle count for.
+ *
+ * @return The number of cycles the instruction takes.
+ */
+int DCPU16::getInstructionCycles(uint16_t instruction)
+{
+    uint16_t op, oa, ob;
+    splitInstruction(instruction, &op, &oa, &ob);
+
+    int cycles = getOperationCycles(instruction);
+    cycles    += getOperationCycles(ob);
+    cycles    += op == EXT ? 0 : getOperandCycles(oa);
+
+    return cycles;
+}
+
+/*
+ * @param instruction The instruction to get the operaion cycle count for.
+ *
+ * @return The number of cycles the instruction's operation takes.
+ */
+int DCPU16::getOperationCycles(uint16_t instruction)
+{
+    uint16_t op, oa, ob;
+    splitInstruction(instruction, &op, &oa, &ob);
+
+    switch(op)
+    {
+    case SET: return 1;
+    case ADD: return 2;
+    case SUB: return 2;
+    case MUL: return 2;
+    case DIV: return 3;
+    case MOD: return 3;
+    case SHL: return 2;
+    case SHR: return 2;
+    case AND: return 1;
+    case BOR: return 1;
+    case XOR: return 1;
+    case IFE: return 2;
+    case IFN: return 2;
+    case IFG: return 2;
+    case IFB: return 2;
+    default:
+        switch(oa)
+        {
+            case JSR: return 2;
+            default:  return 0;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * @param operand Operand extracted from an instruction.
+ *
+ * @return The number of cycles the operand takes.
+ */
+int DCPU16::getOperandCycles(uint16_t operand)
+{
+    if(OPERAND_REGISTER_PTR < operand && operand <= OPERAND_REGISTER_NEXT_WORD_PTR)
+        return 1;
+    if(OPERAND_NEXT_WORD_PTR == operand)
+        return 1;
+    if(OPERAND_LITERAL == operand)
+        return 1;
+    return 0;
 }
 
 bool DCPU16::writePtr(uint16_t *ptr, uint16_t value)
@@ -272,11 +334,10 @@ void DCPU16::printState()
 {
     std::cout << "clock           = " << std::dec << clock << "\n";
     std::cout << "program counter = " << std::dec << pc << "\n";
-    std::cout << "instruction     = " << std::hex << last_instruction << "\n";
+    std::cout << "instruction     = " << std::hex << last_instruction.instruction << "\n";
     std::cout << "stack pointer   = " << sp << "\n";
     std::cout << "stack peek      = " << mem[sp] << "\n";
     std::cout << "overflow        = " << overflow << "\n";
-    std::cout << "skip            = " << skip_next << "\n";
     std::cout << "error           = " << error << "\n";
     for(int i = 0; i < NUM_REGISTERS; i++)
         std::cout << "register[" << i << "]    = " << reg[i] << "\n";

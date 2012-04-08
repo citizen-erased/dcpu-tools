@@ -9,6 +9,50 @@
 
 #include "../library/pstdint.h"
 
+struct InstructionData
+{
+    /*
+     * 16 bit instruction where:
+     *   bbbbbbaaaaaaoooooo
+     * o = operation
+     * a = operand a
+     * b = operand b
+     */
+    uint16_t instruction;
+
+    /*
+     * Address of the instruction in the cpu's memory.
+     */
+    uint16_t instruction_address;
+
+    /*
+     * Operation and two operands extracted from the instruction.
+     */
+    uint16_t op, oa, ob;
+
+    /*
+     * Value each operand resolves to. These can be:
+     * - A literal encoded in the operand.
+     * - A literal appearing in the words after the instruction.
+     * - A value in the cpu's memory.
+     * - A register.
+     * - The stack pointer.
+     * - The program counter.
+     * - Overflow.
+     * - Undefined if the operand is an extended instruction.
+     *
+     * If the value is writable a pointer is set to its memory location (in
+     * real memory), or NULL otherwise.
+     */
+    uint16_t a, *aptr, b, *bptr;
+
+    /*
+     * The number of cycles the instruction takes. This is the sum of the
+     * operation and operand's cycles.
+     */
+    uint16_t cycles;
+};
+
 class DCPU16
 {
 /*---------------------------------------------------------------------------
@@ -73,6 +117,24 @@ public:
         NUM_REGISTERS = 8,
     };
 
+    enum
+    {
+        OPERAND_REGISTER                = 0x07,
+        OPERAND_REGISTER_PTR            = 0x0F,
+        OPERAND_REGISTER_NEXT_WORD_PTR  = 0x17,
+        OPERAND_POP                     = 0x18,
+        OPERAND_PEEK                    = 0x19,
+        OPERAND_PUSH                    = 0x1A,
+        OPERAND_SP                      = 0x1B,
+        OPERAND_PC                      = 0x1C,
+        OPERAND_OVERFLOW                = 0x1D,
+        OPERAND_NEXT_WORD_PTR           = 0x1E,
+        OPERAND_NEXT_WORD_LITERAL       = 0x1F,
+
+        /* Offset where literals start. */
+        OPERAND_LITERAL                 = 0x20,
+    };
+
 
 /*---------------------------------------------------------------------------
  * Members
@@ -91,13 +153,9 @@ public:
     uint8_t  mem_flags[MEMORY_SIZE];
 
     uint64_t clock;
-    uint64_t last_instruction;
     int      error;
-    bool     skip_next; //TODO make into flags with other state?
 
-    uint16_t op_cycles[16];
-    uint16_t ext1_op_cycles[16];
-    uint16_t operand_cycles[0x20];
+    InstructionData last_instruction;
     
 
 
@@ -108,9 +166,16 @@ public:
     DCPU16();
 
     void reset();
-    void tick();
 
     void loadProgram(const uint16_t *words, uint16_t num_words);
+
+    void tick();
+    InstructionData nextInstruction();
+    void splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob);
+
+    int getInstructionCycles(uint16_t instruction);
+    int getOperationCycles(uint16_t instruction);
+    int getOperandCycles(uint16_t operand);
 
     void printState();
     int getError() const;
