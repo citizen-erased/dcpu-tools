@@ -16,7 +16,7 @@ int main()
     for(int i = 0; i < 64; i++)
     {
         dcpu.printState();
-        dcpu.tick();
+        dcpu.step();
     }
     dcpu.printState();
 }

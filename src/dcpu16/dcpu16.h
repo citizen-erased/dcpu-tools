@@ -9,6 +9,7 @@
 
 #include "../library/pstdint.h"
 
+
 struct InstructionData
 {
     /*
@@ -52,6 +53,7 @@ struct InstructionData
      */
     uint16_t cycles;
 };
+
 
 class DCPU16
 {
@@ -158,34 +160,76 @@ public:
     InstructionData last_instruction;
     
 
-
 /*---------------------------------------------------------------------------
- * 
+ * Initialization
  *--------------------------------------------------------------------------*/
 public:
     DCPU16();
-
-    void reset();
-
     void loadProgram(const uint16_t *words, uint16_t num_words);
 
-    void tick();
+
+/*---------------------------------------------------------------------------
+ * Instruction Processing
+ *--------------------------------------------------------------------------*/
+public:
     InstructionData nextInstruction();
-    void splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob);
+    void splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob) const;
 
-    int getInstructionCycles(uint16_t instruction);
-    int getOperationCycles(uint16_t instruction);
-    int getOperandCycles(uint16_t operand);
+    int getInstructionCycles(uint16_t instruction) const;
+    int getOperationCycles(uint16_t instruction) const;
+    int getOperandCycles(uint16_t operand) const;
 
-    void printState();
+private:
+    void processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value);
+
+
+/*---------------------------------------------------------------------------
+ * CPU State
+ *--------------------------------------------------------------------------*/
+public:
+    void step();
+    void reset();
+
+    uint16_t getRegister(uint16_t i) const;
+    uint16_t getProgramCounter() const;
+    uint16_t getStackPointer() const;
+    uint16_t getOverflow() const;
+    uint16_t getCycles() const;
+
+/*---------------------------------------------------------------------------
+ * Memory Operations
+ *--------------------------------------------------------------------------*/
+public:
+    const uint16_t* memoryPointer() const;
+
+private:
+    bool writePtr(uint16_t *ptr, uint16_t value);
+
+
+/*---------------------------------------------------------------------------
+ * Error State
+ *--------------------------------------------------------------------------*/
+public:
     int getError() const;
+    const char* getErrorString(int err) const;
+
 private:
     void setError(int err);
 
 
-private:
-    void processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value);
-    bool writePtr(uint16_t *ptr, uint16_t value);
+/*---------------------------------------------------------------------------
+ * Serialization
+ *--------------------------------------------------------------------------*/
+public:
+    size_t serialize(uint8_t *buffer) const;
+    void   deserialize(uint8_t *buffer);
+
+
+/*---------------------------------------------------------------------------
+ * Debug
+ *--------------------------------------------------------------------------*/
+public:
+    void printState() const;
 };
 
 #endif /* DCPU16_H_ */

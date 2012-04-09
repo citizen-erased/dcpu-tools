@@ -31,7 +31,7 @@ void DCPU16::loadProgram(const uint16_t *words, uint16_t num_words)
     std::copy(words, words+num_words, mem);
 }
 
-void DCPU16::tick()
+void DCPU16::step()
 {
     if(error)
         return;
@@ -182,7 +182,7 @@ InstructionData DCPU16::nextInstruction()
     return data;
 }
 
-void DCPU16::splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob)
+void DCPU16::splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob) const
 {
     *op = (instruction >> INST_OP_SHIFT) & INST_OP_MASK;
     *oa = (instruction >> INST_VA_SHIFT) & INST_VA_MASK;
@@ -199,7 +199,7 @@ void DCPU16::processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value)
 
     *ptr = NULL;
 
-    if(operand <= OPERAND_REGISTER) //TODO check overflow works correctly here
+    if(operand <= OPERAND_REGISTER)
         *ptr = reg + operand;
     else if(operand <= OPERAND_REGISTER_PTR)
         *ptr = mem + reg[operand % NUM_REGISTERS];
@@ -220,7 +220,7 @@ void DCPU16::processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value)
     else if(OPERAND_NEXT_WORD_PTR == operand)
         *ptr = mem + mem[pc++];
     else if(OPERAND_NEXT_WORD_LITERAL == operand)
-        *ptr = mem + pc++;
+        *value = mem[pc++];
     else
         *value = operand - OPERAND_LITERAL;
 
@@ -235,7 +235,7 @@ void DCPU16::processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value)
  *
  * @return The number of cycles the instruction takes.
  */
-int DCPU16::getInstructionCycles(uint16_t instruction)
+int DCPU16::getInstructionCycles(uint16_t instruction) const
 {
     uint16_t op, oa, ob;
     splitInstruction(instruction, &op, &oa, &ob);
@@ -252,7 +252,7 @@ int DCPU16::getInstructionCycles(uint16_t instruction)
  *
  * @return The number of cycles the instruction's operation takes.
  */
-int DCPU16::getOperationCycles(uint16_t instruction)
+int DCPU16::getOperationCycles(uint16_t instruction) const
 {
     uint16_t op, oa, ob;
     splitInstruction(instruction, &op, &oa, &ob);
@@ -290,7 +290,7 @@ int DCPU16::getOperationCycles(uint16_t instruction)
  *
  * @return The number of cycles the operand takes.
  */
-int DCPU16::getOperandCycles(uint16_t operand)
+int DCPU16::getOperandCycles(uint16_t operand) const
 {
     if(OPERAND_REGISTER_PTR < operand && operand <= OPERAND_REGISTER_NEXT_WORD_PTR)
         return 1;
@@ -330,7 +330,33 @@ void DCPU16::setError(int err)
     error = err;
 }
 
-void DCPU16::printState()
+uint16_t DCPU16::getRegister(uint16_t i) const
+{
+    return reg[i % NUM_REGISTERS];
+}
+
+uint16_t DCPU16::getProgramCounter() const { return pc;       }
+uint16_t DCPU16::getStackPointer()   const { return sp;       }
+uint16_t DCPU16::getOverflow()       const { return overflow; }
+uint16_t DCPU16::getCycles()         const { return clock;    }
+
+const uint16_t* DCPU16::memoryPointer() const
+{
+    return mem;
+}
+
+size_t DCPU16::serialize(uint8_t *buffer) const
+{
+    //TODO
+    return 0;
+}
+
+void DCPU16::deserialize(uint8_t *buffer)
+{
+    //TODO
+}
+
+void DCPU16::printState() const
 {
     std::cout << "clock           = " << std::dec << clock << "\n";
     std::cout << "program counter = " << std::dec << pc << "\n";
