@@ -1,11 +1,31 @@
-DCPU Tools is a collection of tools for Notch's DCPU-16 computer.
+A collection of tools for Notch's DCPU-16 computer written in C++.
 
 DCPU16:
 An implementation of Notch's DCPU-16 described here: http://0x10c.com/doc/dcpu-16.txt 
+The emulator code can be used in other projects by copying the dcpu16 and library folders.
+TODO Command line interface
 
 Assembler:
 coming soon!
 
+Disassembler:
+TODO Command line interface
+
 Debugger:
-coming soon!
+A visual debugger written using FLTK. This is currently work in progress.
+Features:
+* memory view
+* disassembly
+* stepping
+* reverse stepping
+TODO:
+* gui layout
+* loading from file
+* break points
+* watch memory/cpu state
+
+
+Building the tools:
+Dependencies: scons, fltk
+Run scons in the project's root directory.
 
