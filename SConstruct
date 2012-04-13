@@ -30,6 +30,8 @@ libs_debugger = [
 VariantDir("build", "src", duplicate=0)
 
 cpp_flags = ["-Wall", "-Wextra", "-g"]
+#cpp_flags = ["-Wall", "-Wextra", "-O3"]
+
 env = Environment(
     CCFLAGS     = cpp_flags,
 )
