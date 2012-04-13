@@ -330,19 +330,44 @@ void DCPU16::setError(int err)
     error = err;
 }
 
-uint16_t DCPU16::getRegister(uint16_t i) const
+uint16_t DCPU16::read(uint32_t addr) const
 {
-    return reg[i % NUM_REGISTERS];
+    if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
+        return reg[addr - RW_REGISTER_0];
+    else if(RW_PROGRAM_COUNTER == addr)
+        return pc;
+    else if(RW_STACK_POINTER == addr)
+        return sp;
+    else if(RW_OVERFLOW == addr)
+        return overflow;
+    else if(0 <= addr && addr < MEMORY_SIZE)
+        return mem[addr];
+
+    return 0;
 }
 
-uint16_t DCPU16::getProgramCounter() const { return pc;       }
-uint16_t DCPU16::getStackPointer()   const { return sp;       }
-uint16_t DCPU16::getOverflow()       const { return overflow; }
-uint16_t DCPU16::getCycles()         const { return clock;    }
+void DCPU16::write(uint32_t addr, uint16_t value) 
+{
+    if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
+        reg[addr - RW_REGISTER_0] = value;
+    else if(RW_PROGRAM_COUNTER == addr)
+        pc = value;
+    else if(RW_STACK_POINTER == addr)
+        sp = value;
+    else if(RW_OVERFLOW == addr)
+        overflow = value;
+    else if(0 <= addr && addr < MEMORY_SIZE)
+        mem[addr] = value;
+}
 
 const uint16_t* DCPU16::memoryPointer() const
 {
     return mem;
+}
+
+uint64_t DCPU16::getCycles() const
+{
+    return clock;
 }
 
 size_t DCPU16::serialize(uint8_t *buffer) const

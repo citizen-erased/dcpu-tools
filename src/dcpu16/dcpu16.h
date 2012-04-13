@@ -137,6 +137,31 @@ public:
         OPERAND_LITERAL                 = 0x20,
     };
 
+    /*
+     * Read/write constants to select what to get back when calling read() ,
+     * and what to write to when calling the write().  Since the function
+     * accepts memory addresses, constants must not overlap the memory address
+     * space.
+     *
+     * Register constants must be sequential. This allows looping through the
+     * CPU's registers and adding an offset to RW_REGISTER_0 to read/write all
+     * register values.
+     */
+    enum
+    {
+        RW_REGISTER_0 = MEMORY_SIZE,
+        RW_REGISTER_1,
+        RW_REGISTER_2,
+        RW_REGISTER_3,
+        RW_REGISTER_4,
+        RW_REGISTER_5,
+        RW_REGISTER_6,
+        RW_REGISTER_7,
+        RW_PROGRAM_COUNTER,
+        RW_STACK_POINTER,
+        RW_OVERFLOW,
+    };
+
 
 /*---------------------------------------------------------------------------
  * Members
@@ -184,22 +209,20 @@ private:
 
 
 /*---------------------------------------------------------------------------
- * CPU State
+ * CPU 
  *--------------------------------------------------------------------------*/
 public:
     void step();
     void reset();
+    uint64_t getCycles() const;
 
-    uint16_t getRegister(uint16_t i) const;
-    uint16_t getProgramCounter() const;
-    uint16_t getStackPointer() const;
-    uint16_t getOverflow() const;
-    uint16_t getCycles() const;
 
 /*---------------------------------------------------------------------------
  * Memory Operations
  *--------------------------------------------------------------------------*/
 public:
+    uint16_t read(uint32_t addr) const;
+    void  write(uint32_t addr, uint16_t value);
     const uint16_t* memoryPointer() const;
 
 private:
