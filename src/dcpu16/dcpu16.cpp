@@ -6,6 +6,17 @@
 #include "dcpu16.h"
 
 
+InstructionData::InstructionData()
+{
+    instruction = 0;
+    instruction_address = 0;
+    op = oa = ob = 0;
+    a = b = 0;
+    aptr = bptr = NULL;
+    cycles = 0;
+}
+
+
 DCPU16::DCPU16()
 {
     reset();
@@ -17,8 +28,8 @@ void DCPU16::reset()
     sp = 0;
     overflow = 0;
     clock = 0;
-    //last_instruction = 0; //TODO initialize last instruction or make sure it has a constructor
     error = ERROR_NONE;
+    last_instruction = InstructionData();
 
     std::fill(mem, mem+MEMORY_SIZE, 0);
     std::fill(mem_flags, mem_flags+MEMORY_SIZE, 0);
@@ -128,18 +139,21 @@ void DCPU16::step()
         break;
 
     case EXT:
+    {
         switch(oa)
         {
         case JSR:
             mem[--sp] = pc;
             pc = b;
             break;
-        }
-        break;
 
-    default:
-        setError(ERROR_OPCODE_INVALID);
+        default: setError(ERROR_OPCODE_INVALID); break;
+        }
+
         break;
+    }
+
+    default: setError(ERROR_OPCODE_INVALID); break;
     }
 
     clock += instruction.cycles;
@@ -324,15 +338,32 @@ int DCPU16::getError() const
     return error;
 }
 
+const char* DCPU16::getErrorString(int err) const
+{
+    switch(err)
+    {
+        case ERROR_NONE:            return "ERROR_NONE";
+        case ERROR_STACK_OVERFLOW:  return "ERROR_STACK_OVERFLOW";
+        case ERROR_STACK_UNDERFLOW: return "ERROR_STACK_UNDERFLOW";
+        case ERROR_OPCODE_INVALID:  return "ERROR_OPCODE_INVALID";
+        default: break;
+    }
+
+    return "UNKNOWN";
+}
+
 void DCPU16::setError(int err)
 {
-    //TODO print info?
+    //TODO print info to print object thing?
     error = err;
+    std::cout << getErrorString(error);
 }
 
 uint16_t DCPU16::read(uint32_t addr) const
 {
-    if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
+    if(addr < MEMORY_SIZE)
+        return mem[addr];
+    else if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
         return reg[addr - RW_REGISTER_0];
     else if(RW_PROGRAM_COUNTER == addr)
         return pc;
@@ -340,15 +371,15 @@ uint16_t DCPU16::read(uint32_t addr) const
         return sp;
     else if(RW_OVERFLOW == addr)
         return overflow;
-    else if(0 <= addr && addr < MEMORY_SIZE)
-        return mem[addr];
 
     return 0;
 }
 
 void DCPU16::write(uint32_t addr, uint16_t value) 
 {
-    if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
+    if(addr < MEMORY_SIZE)
+        mem[addr] = value;
+    else if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
         reg[addr - RW_REGISTER_0] = value;
     else if(RW_PROGRAM_COUNTER == addr)
         pc = value;
@@ -356,8 +387,6 @@ void DCPU16::write(uint32_t addr, uint16_t value)
         sp = value;
     else if(RW_OVERFLOW == addr)
         overflow = value;
-    else if(0 <= addr && addr < MEMORY_SIZE)
-        mem[addr] = value;
 }
 
 const uint16_t* DCPU16::memoryPointer() const

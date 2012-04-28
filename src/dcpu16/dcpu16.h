@@ -13,7 +13,7 @@
 struct InstructionData
 {
     /*
-     * 16 bit instruction where:
+     * 16 bit instruction. Bits are used as follows:
      *   bbbbbbaaaaaaoooooo
      * o = operation
      * a = operand a
@@ -52,6 +52,9 @@ struct InstructionData
      * operation and operand's cycles.
      */
     uint16_t cycles;
+
+
+    InstructionData();
 };
 
 
@@ -101,7 +104,8 @@ public:
     enum
     {
         /*
-         * Always 0 so conditionals can evaluate to false on no error.
+         * No error is always 0 so conditionals can evaluate to false on no
+         * error.
          */
         ERROR_NONE = 0,
         ERROR_STACK_OVERFLOW,
@@ -189,70 +193,70 @@ public:
  * Initialization
  *--------------------------------------------------------------------------*/
 public:
-    DCPU16();
-    void loadProgram(const uint16_t *words, uint16_t num_words);
+                        DCPU16();
 
 
 /*---------------------------------------------------------------------------
  * Instruction Processing
  *--------------------------------------------------------------------------*/
 public:
-    InstructionData nextInstruction();
-    void splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob) const;
+    InstructionData     nextInstruction();
+    void                splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob) const;
 
-    int getInstructionCycles(uint16_t instruction) const;
-    int getOperationCycles(uint16_t instruction) const;
-    int getOperandCycles(uint16_t operand) const;
+    int                 getInstructionCycles(uint16_t instruction) const;
+    int                 getOperationCycles(uint16_t instruction) const;
+    int                 getOperandCycles(uint16_t operand) const;
 
 private:
-    void processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value);
+    void                processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value);
 
 
 /*---------------------------------------------------------------------------
  * CPU 
  *--------------------------------------------------------------------------*/
 public:
-    void step();
-    void reset();
-    uint64_t getCycles() const;
+    void                loadProgram(const uint16_t *words, uint16_t num_words);
+    void                step();
+    void                reset();
+    uint64_t            getCycles() const;
 
 
 /*---------------------------------------------------------------------------
  * Memory Operations
  *--------------------------------------------------------------------------*/
 public:
-    uint16_t read(uint32_t addr) const;
-    void  write(uint32_t addr, uint16_t value);
-    const uint16_t* memoryPointer() const;
+    uint16_t            read(uint32_t addr) const;
+    void                write(uint32_t addr, uint16_t value);
+    const uint16_t*     memoryPointer() const;
 
 private:
-    bool writePtr(uint16_t *ptr, uint16_t value);
+    bool                writePtr(uint16_t *ptr, uint16_t value);
 
 
 /*---------------------------------------------------------------------------
  * Error State
  *--------------------------------------------------------------------------*/
 public:
-    int getError() const;
-    const char* getErrorString(int err) const;
+    int                 getError() const;
+    const char*         getErrorString(int err) const;
 
 private:
-    void setError(int err);
+    void                setError(int err);
 
 
 /*---------------------------------------------------------------------------
  * Serialization
  *--------------------------------------------------------------------------*/
 public:
-    size_t serialize(uint8_t *buffer) const;
-    void   deserialize(uint8_t *buffer);
+    size_t              serialize(uint8_t *buffer) const;
+    void                deserialize(uint8_t *buffer);
 
 
 /*---------------------------------------------------------------------------
  * Debug
  *--------------------------------------------------------------------------*/
 public:
-    void printState() const;
+    void                printState() const;
 };
 
 #endif /* DCPU16_H_ */

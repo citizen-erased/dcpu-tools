@@ -7,10 +7,10 @@ void Disassembler::disassemble(uint16_t *words, uint16_t num_words)
     instructions.clear();
     dcpu.loadProgram(words, num_words);
 
-    while(dcpu.getProgramCounter() < num_words)
+    while(dcpu.read(DCPU16::RW_PROGRAM_COUNTER) < num_words)
     {
         Instruction inst;
-        inst.address = dcpu.getProgramCounter();
+        inst.address = dcpu.read(DCPU16::RW_PROGRAM_COUNTER);
         inst.index = static_cast<uint16_t>(instructions.size());
         InstructionData data = dcpu.nextInstruction();
 
@@ -70,7 +70,7 @@ const Disassembler::Instruction* Disassembler::getInstruction(uint16_t index) co
 const Disassembler::Instruction* Disassembler::findInstructionFromAddress(uint16_t address) const
 {
     for(size_t i = 0; i < instructions.size(); i++)
-        if(address = instructions[i].address)
+        if(address == instructions[i].address)
             return &instructions[i];
     return NULL;
 }
