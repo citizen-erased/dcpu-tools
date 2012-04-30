@@ -26,7 +26,8 @@ void DCPU16::reset()
 {
     pc = 0;
     sp = 0;
-    overflow = 0;
+    ex = 0;
+    ia = 0;
     clock = 0;
     error = ERROR_NONE;
     last_instruction = InstructionData();
@@ -51,110 +52,21 @@ void DCPU16::step()
     last_instruction = instruction;
 
     uint16_t op    = instruction.op;
-    uint16_t oa    = instruction.oa;
+    uint16_t ob    = instruction.ob;
     uint16_t a     = instruction.a;
     uint16_t b     = instruction.b;
     uint16_t *aptr = instruction.aptr;
+    uint16_t *bptr = instruction.bptr;
 
     /* true if a conditional fails. */
     bool skip_next = false;
 
-    /* signed 32 bit values to perform intermediate operation with. */
-    int64_t a64 = a, b64 = b;
-
-    switch(op)
-    {
-    case SET: 
-        writePtr(aptr, b);
-        break;
-
-    case ADD:
-        writePtr(aptr, a + b);
-        overflow = a64 + b64 > 0xFFFF ? 0x0001 : 0x0000;
-        break;
-
-    case SUB:
-        writePtr(aptr, a - b);
-        overflow = a64 - b64 < 0 ? 0xFFFF : 0x0000;
-        break;
-
-    case MUL:
-        writePtr(aptr, a * b);
-        overflow = ((a64 * b64) >> 16) & 0xFFFF;
-        break;
-
-    case DIV:
-        if(b == 0)
-        {
-            writePtr(aptr, 0);
-            overflow = 0x0000;
-        }
-        else
-        {
-            writePtr(aptr, a / b);
-            overflow = ((a64 << 16) / b64) & 0xFFFF;
-        }
-        break;
-
-    case MOD:
-            writePtr(aptr, b == 0 ? 0 : a % b);
-        break;
-
-    case SHL:
-        writePtr(aptr, a << b);
-        overflow = ((a64 << b64) >> 16) & 0xFFFF;
-        break;
-
-    case SHR:
-        writePtr(aptr, a >> b);
-        overflow = ((a64 << 16) >> b64) & 0xFFFF;
-        break;
-
-    case AND:
-        writePtr(aptr, a & b);
-        break;
-
-    case BOR:
-        writePtr(aptr, a | b);
-        break;
-
-    case XOR:
-        writePtr(aptr, a ^ b);
-        break;
-
-    case IFE:
-        skip_next = !(a == b);
-        break;
-
-    case IFN:
-        skip_next = !(a != b);
-        break;
-
-    case IFG:
-        skip_next = !(a > b);
-        break;
-
-    case IFB:
-        skip_next = !((a & b) != 0);
-        break;
-
-    case EXT:
-    {
-        switch(oa)
-        {
-        case JSR:
-            mem[--sp] = pc;
-            pc = b;
-            break;
-
-        default: setError(ERROR_OPCODE_INVALID); break;
-        }
-
-        break;
-    }
-
-    default: setError(ERROR_OPCODE_INVALID); break;
-    }
+    if(op != EXT)
+        doOpcode(op, a, b, bptr, &skip_next);
+    else if(ob != EXT)
+        doOpcodeExt0(ob, a, b, aptr);
+    else
+        setError(ERROR_OPCODE_INVALID);
 
     clock += instruction.cycles;
 
@@ -162,6 +74,196 @@ void DCPU16::step()
     {
         nextInstruction();
         clock += 2;
+    }
+}
+
+void DCPU16::doOpcode(uint16_t op, uint16_t a, uint16_t b, uint16_t *bptr, bool *skip_next)
+{
+    /* signed 64 bit values to perform intermediate operation with. */
+    int64_t a64 = a, b64 = b;
+    int16_t sa = a;
+    int16_t sb = b;
+
+    switch(op)
+    {
+    case SET: 
+        writePtr(bptr, a);
+        break;
+
+    case ADD:
+        writePtr(bptr, b + a);
+        ex = b64 + a64 > 0xFFFF ? 0x0001 : 0x0000;
+        break;
+
+    case SUB:
+        writePtr(bptr, b - a);
+        ex = b64 - a64 < 0 ? 0xFFFF : 0x0000;
+        break;
+
+    case MUL:
+        writePtr(bptr, b * a);
+        ex = ((b64 * a64) >> 16) & 0xFFFF;
+        break;
+
+    case MLI:
+        //TODO
+        break;
+
+    case DIV:
+        if(a == 0)
+        {
+            writePtr(bptr, 0);
+            ex = 0x0000;
+        }
+        else
+        {
+            writePtr(bptr, b / a);
+            ex = ((b64 << 16) / a64) & 0xFFFF;
+        }
+        break;
+
+    case DVI:
+        //TODO
+        break;
+
+    case MOD:
+            writePtr(bptr, a == 0 ? 0 : b % a);
+        break;
+
+    case MDI:
+        //TODO
+        break;
+
+    case AND:
+        writePtr(bptr, b & a);
+        break;
+
+    case BOR:
+        writePtr(bptr, b | a);
+        break;
+
+    case XOR:
+        writePtr(bptr, b ^ a);
+        break;
+
+    case SHR:
+        writePtr(bptr, b >> a);
+        ex = ((b64 << 16) >> a64) & 0xFFFF;
+        break;
+
+    case ASR:
+        //TODO
+        break;
+
+    case SHL:
+        writePtr(bptr, b << a);
+        ex = ((b64 << a64) >> 16) & 0xFFFF;
+        break;
+
+    case IFB:
+        *skip_next = !((b & a) != 0);
+        break;
+
+    case IFC:
+        *skip_next = !((b & a) == 0);
+        break;
+
+    case IFE:
+        *skip_next = !(b == a);
+        break;
+
+    case IFN:
+        *skip_next = !(b != a);
+        break;
+
+    case IFG:
+        *skip_next = !(b > a);
+        break;
+
+    case IFA:
+        *skip_next = !(sb > sa);
+        break;
+
+    case IFL:
+        *skip_next = !(b < a);
+        break;
+
+    case IFU:
+        *skip_next = !(sb < sa);
+        break;
+
+    case ADX:
+        writePtr(bptr, b + a + ex);
+        ex = b64 + a64 + ex > 0 ? 0x0001 : 0x0000;
+        break;
+
+    case SBX:
+        writePtr(bptr, b - a + ex);
+        ex = b64 - a64 + ex < 0 ? 0xFFFF : 0x0000;
+        break;
+
+    case STI:
+        writePtr(bptr, a);
+        reg[REG_I]++;
+        reg[REG_J]++;
+        break;
+
+    case STD:
+        writePtr(bptr, a);
+        reg[REG_I]--;
+        reg[REG_J]--;
+        break;
+
+    default:
+        setError(ERROR_OPCODE_INVALID);
+        break;
+    }
+}
+
+void DCPU16::doOpcodeExt0(uint16_t op, uint16_t a, uint16_t b, uint16_t *aptr)
+{
+    switch(op)
+    {
+    case JSR:
+        mem[--sp] = pc;
+        pc = a;
+        break;
+
+    case INT:
+        //TODO
+        break;
+
+    case IAG:
+        writePtr(aptr, ia);
+        break;
+
+    case IAS:
+        ia = a;
+        break;
+
+    case RFI:
+        //TODO
+        break;
+
+    case IAQ:
+        //TODO
+        break;
+
+    case HWN:
+        //TODO
+        break;
+
+    case HWQ:
+        //TODO
+        break;
+
+    case HWI:
+        //TODO
+        break;
+
+    default:
+        setError(ERROR_OPCODE_INVALID);
+        break;
     }
 }
 
@@ -183,14 +285,14 @@ InstructionData DCPU16::nextInstruction()
 
     if(data.op != EXT)
     {
-        processOperand(data.oa, &data.aptr, &data.a);
-        processOperand(data.ob, &data.bptr, &data.b);
+        processOperand(data.oa, &data.aptr, &data.a, OPERAND_SOURCE_A);
+        processOperand(data.ob, &data.bptr, &data.b, OPERAND_SOURCE_B);
     }
     else
     {
         data.a = 0;
         data.aptr = NULL;
-        processOperand(data.ob, &data.bptr, &data.b);
+        processOperand(data.ob, &data.bptr, &data.b, OPERAND_SOURCE_B);
     }
 
     return data;
@@ -198,12 +300,12 @@ InstructionData DCPU16::nextInstruction()
 
 void DCPU16::splitInstruction(uint16_t instruction, uint16_t *op, uint16_t *oa, uint16_t *ob) const
 {
-    *op = (instruction >> INST_OP_SHIFT) & INST_OP_MASK;
-    *oa = (instruction >> INST_VA_SHIFT) & INST_VA_MASK;
-    *ob = (instruction >> INST_VB_SHIFT) & INST_VB_MASK;
+    *op = (instruction & INST_OP_MASK) >> INST_OP_SHIFT;
+    *oa = (instruction & INST_VA_MASK) >> INST_VA_SHIFT;
+    *ob = (instruction & INST_VB_MASK) >> INST_VB_SHIFT;
 }
 
-void DCPU16::processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value)
+void DCPU16::processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value, char source)
 {
     /*
      * When indexing registers it's possible to compute the index as (operand %
@@ -219,24 +321,25 @@ void DCPU16::processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value)
         *ptr = mem + reg[operand % NUM_REGISTERS];
     else if(operand <= OPERAND_REGISTER_NEXT_WORD_PTR)
         *ptr = mem + mem[pc++] + reg[operand % NUM_REGISTERS];
-    else if(OPERAND_POP == operand)
+    else if(OPERAND_PUSH_POP == operand && OPERAND_SOURCE_A == source) // POP
         *ptr = mem + sp++;
+    else if(OPERAND_PUSH_POP == operand && OPERAND_SOURCE_B == source) // PUSH
+        *ptr = mem + --sp;
     else if(OPERAND_PEEK == operand)
         *ptr = mem + sp;
-    else if(OPERAND_PUSH == operand)
-        *ptr = mem + --sp;
     else if(OPERAND_SP == operand)
         *ptr = &sp;
     else if(OPERAND_PC == operand)
         *ptr = &pc;
-    else if(OPERAND_OVERFLOW == operand)
-        *ptr = &overflow;
+    else if(OPERAND_EX == operand)
+        *ptr = &ex;
     else if(OPERAND_NEXT_WORD_PTR == operand)
         *ptr = mem + mem[pc++];
     else if(OPERAND_NEXT_WORD_LITERAL == operand)
         *value = mem[pc++];
     else
-        *value = operand - OPERAND_LITERAL;
+        /* literals in the range [-1, 30] */
+        *value = operand - OPERAND_LITERAL - 1;
 
     if(*ptr) *value = **ptr;
 }
@@ -271,28 +374,54 @@ int DCPU16::getOperationCycles(uint16_t instruction) const
     uint16_t op, oa, ob;
     splitInstruction(instruction, &op, &oa, &ob);
 
-    switch(op)
+    if(op != EXT)
     {
-    case SET: return 1;
-    case ADD: return 2;
-    case SUB: return 2;
-    case MUL: return 2;
-    case DIV: return 3;
-    case MOD: return 3;
-    case SHL: return 2;
-    case SHR: return 2;
-    case AND: return 1;
-    case BOR: return 1;
-    case XOR: return 1;
-    case IFE: return 2;
-    case IFN: return 2;
-    case IFG: return 2;
-    case IFB: return 2;
-    default:
-        switch(oa)
+        switch(op)
         {
-            case JSR: return 2;
-            default:  return 0;
+            case SET: return 1;
+            case ADD: return 2;
+            case SUB: return 2;
+            case MUL: return 2;
+            case MLI: return 2;
+            case DIV: return 3;
+            case DVI: return 3;
+            case MOD: return 3;
+            case MDI: return 3;
+            case AND: return 1;
+            case BOR: return 1;
+            case XOR: return 1;
+            case SHR: return 1;
+            case ASR: return 1;
+            case SHL: return 1;
+            case IFB: return 2;
+            case IFC: return 2;
+            case IFE: return 2;
+            case IFN: return 2;
+            case IFG: return 2;
+            case IFA: return 2;
+            case IFL: return 2;
+            case IFU: return 2;
+            case ADX: return 3;
+            case SBX: return 3;
+            case STI: return 2;
+            case STD: return 2;
+            default:  break;
+        }
+    }
+    else if(ob != EXT)
+    {
+        switch(ob)
+        {
+            case JSR: return 3;
+            case INT: return 4;
+            case IAG: return 1;
+            case IAS: return 1;
+            case RFI: return 3;
+            case IAQ: return 2;
+            case HWN: return 2;
+            case HWQ: return 4;
+            case HWI: return 4;
+            default:  break;
         }
     }
 
@@ -369,8 +498,8 @@ uint16_t DCPU16::read(uint32_t addr) const
         return pc;
     else if(RW_STACK_POINTER == addr)
         return sp;
-    else if(RW_OVERFLOW == addr)
-        return overflow;
+    else if(RW_EXCESS == addr)
+        return ex;
 
     return 0;
 }
@@ -385,8 +514,8 @@ void DCPU16::write(uint32_t addr, uint16_t value)
         pc = value;
     else if(RW_STACK_POINTER == addr)
         sp = value;
-    else if(RW_OVERFLOW == addr)
-        overflow = value;
+    else if(RW_EXCESS == addr)
+        ex = value;
 }
 
 const uint16_t* DCPU16::memoryPointer() const
@@ -417,7 +546,8 @@ void DCPU16::printState() const
     std::cout << "instruction     = " << std::hex << last_instruction.instruction << "\n";
     std::cout << "stack pointer   = " << sp << "\n";
     std::cout << "stack peek      = " << mem[sp] << "\n";
-    std::cout << "overflow        = " << overflow << "\n";
+    std::cout << "ex              = " << ex << "\n";
+    std::cout << "ia              = " << ia << "\n";
     std::cout << "error           = " << error << "\n";
     for(int i = 0; i < NUM_REGISTERS; i++)
         std::cout << "register[" << i << "]    = " << reg[i] << "\n";

@@ -1,5 +1,7 @@
 A collection of tools for Notch's DCPU-16 computer written in C++.
 
+*** updating to dcpu 1.7 spec in progress ***
+
 DCPU16:
 An implementation of Notch's DCPU-16 described here: http://0x10c.com/doc/dcpu-16.txt 
 The emulator code can be used in other projects by copying the dcpu16 and library folders.

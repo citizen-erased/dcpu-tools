@@ -19,12 +19,12 @@ void Disassembler::disassemble(uint16_t *words, uint16_t num_words)
 
         if(DCPU16::EXT != data.op)
         {
-            getOperandStr(data.oa, data.aptr, data.a, inst.operand_a_str);
-            getOperandStr(data.ob, data.bptr, data.b, inst.operand_b_str);
+            getOperandStr(data.oa, data.aptr, data.a, DCPU16::OPERAND_SOURCE_A, inst.operand_a_str);
+            getOperandStr(data.ob, data.bptr, data.b, DCPU16::OPERAND_SOURCE_B, inst.operand_b_str);
         }
         else
         {
-            getOperandStr(data.ob, data.bptr, data.b, inst.operand_a_str);
+            getOperandStr(data.ob, data.bptr, data.b, DCPU16::OPERAND_SOURCE_B, inst.operand_a_str);
             inst.operand_b_str[0] = 0;
         }
 
@@ -32,7 +32,7 @@ void Disassembler::disassemble(uint16_t *words, uint16_t num_words)
     }
 }
 
-void Disassembler::getOperandStr(uint16_t operand, uint16_t *ptr, uint16_t value, char *str)
+void Disassembler::getOperandStr(uint16_t operand, uint16_t *ptr, uint16_t value, char source, char *str)
 {
     if(operand <= DCPU16::OPERAND_REGISTER)
         sprintf(str, "%s", getRegisterName(operand));
@@ -40,17 +40,17 @@ void Disassembler::getOperandStr(uint16_t operand, uint16_t *ptr, uint16_t value
         sprintf(str, "[%s]", getRegisterName(operand));
     else if(operand <= DCPU16::OPERAND_REGISTER_NEXT_WORD_PTR)
         sprintf(str, "[0x%04X + %s]", (int)value, getRegisterName(operand));
-    else if(DCPU16::OPERAND_POP == operand)
+    else if(DCPU16::OPERAND_PUSH_POP == operand && DCPU16::OPERAND_SOURCE_A == source)
         sprintf(str, "%s", "POP");
+    else if(DCPU16::OPERAND_PUSH_POP == operand && DCPU16::OPERAND_SOURCE_B == source)
+        sprintf(str, "%s", "PUSH");
     else if(DCPU16::OPERAND_PEEK == operand)
         sprintf(str, "%s", "PEEK");
-    else if(DCPU16::OPERAND_PUSH == operand)
-        sprintf(str, "%s", "PUSH");
     else if(DCPU16::OPERAND_SP == operand)
         sprintf(str, "%s", "SP");
     else if(DCPU16::OPERAND_PC == operand)
         sprintf(str, "%s", "PC");
-    else if(DCPU16::OPERAND_OVERFLOW == operand)
+    else if(DCPU16::OPERAND_EX == operand)
         sprintf(str, "%s", "0");
     else if(DCPU16::OPERAND_NEXT_WORD_PTR == operand)
         sprintf(str, "[0x%04X]", (int)(ptr - dcpu.memoryPointer()));

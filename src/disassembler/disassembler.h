@@ -34,7 +34,7 @@ public:
     size_t getInstructionCount() const;
 
 private:
-    void getOperandStr(uint16_t operand, uint16_t *ptr, uint16_t value, char *str);
+    void getOperandStr(uint16_t operand, uint16_t *ptr, uint16_t value, char source, char *str);
 };
 
 #endif /* DISASSEMBLER_H */

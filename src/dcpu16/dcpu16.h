@@ -14,7 +14,7 @@ struct InstructionData
 {
     /*
      * 16 bit instruction. Bits are used as follows:
-     *   bbbbbbaaaaaaoooooo
+     *   aaaaaabbbbbooooo
      * o = operation
      * a = operand a
      * b = operand b
@@ -66,39 +66,59 @@ class DCPU16
 public:
     enum
     {
-        EXT = 0x0,
-        SET = 0x1,
-        ADD = 0x2,
-        SUB = 0x3,
-        MUL = 0x4,
-        DIV = 0x5,
-        MOD = 0x6,
-        SHL = 0x7,
-        SHR = 0x8,
-        AND = 0x9,
-        BOR = 0xa,
-        XOR = 0xB,
-        IFE = 0xC,
-        IFN = 0xD,
-        IFG = 0xE,
-        IFB = 0xF,
+        EXT = 0x00,
+        SET = 0x01,
+        ADD = 0x02,
+        SUB = 0x03,
+        MUL = 0x04,
+        MLI = 0x05,
+        DIV = 0x06,
+        DVI = 0x07,
+        MOD = 0x08,
+        MDI = 0x09,
+        AND = 0x0A,
+        BOR = 0x0B,
+        XOR = 0x0C,
+        SHR = 0x0D,
+        ASR = 0x0E,
+        SHL = 0x0F,
+        IFB = 0x10,
+        IFC = 0x11,
+        IFE = 0x12,
+        IFN = 0x13,
+        IFG = 0x14,
+        IFA = 0x15,
+        IFL = 0x16,
+        IFU = 0x17,
+        ADX = 0x1A,
+        SBX = 0x1B,
+        STI = 0x1E,
+        STD = 0x1F,
     };
 
     enum
     {
         JSR = 0x01,
+        INT = 0x08,
+        IAG = 0x09,
+        IAS = 0x0a,
+        RFI = 0x0b,
+        IAQ = 0x0c,
+        HWN = 0x10,
+        HWQ = 0x11,
+        HWI = 0x12,
     };
 
     enum
     {
         INST_OP_SHIFT = 0,
-        INST_OP_MASK  = 0xF,
+        INST_OP_MASK  = 0x1F,
 
-        INST_VA_SHIFT = 4,
-        INST_VA_MASK  = 0x3F,
+        INST_VA_SHIFT = 5,
+        INST_VA_MASK  = 0x3E0,
 
         INST_VB_SHIFT = 10,
-        INST_VB_MASK  = 0x3F,
+        INST_VB_MASK  = 0xFC00,
     };
 
     enum
@@ -120,7 +140,16 @@ public:
 
     enum
     {
-        NUM_REGISTERS = 8,
+        REG_A = 0x00,
+        REG_B = 0x01,
+        REG_C = 0x02,
+        REG_X = 0x03,
+        REG_Y = 0x04,
+        REG_Z = 0x05,
+        REG_I = 0x06,
+        REG_J = 0x07,
+
+        NUM_REGISTERS,
     };
 
     enum
@@ -128,17 +157,21 @@ public:
         OPERAND_REGISTER                = 0x07,
         OPERAND_REGISTER_PTR            = 0x0F,
         OPERAND_REGISTER_NEXT_WORD_PTR  = 0x17,
-        OPERAND_POP                     = 0x18,
+        OPERAND_PUSH_POP                = 0x18,
         OPERAND_PEEK                    = 0x19,
-        OPERAND_PUSH                    = 0x1A,
+        OPERAND_PICK                    = 0x1A,
         OPERAND_SP                      = 0x1B,
         OPERAND_PC                      = 0x1C,
-        OPERAND_OVERFLOW                = 0x1D,
+        OPERAND_EX                      = 0x1D,
         OPERAND_NEXT_WORD_PTR           = 0x1E,
         OPERAND_NEXT_WORD_LITERAL       = 0x1F,
 
         /* Offset where literals start. */
         OPERAND_LITERAL                 = 0x20,
+
+        /* Instruction bits an operand was extracted from. */
+        OPERAND_SOURCE_A,
+        OPERAND_SOURCE_B,
     };
 
     /*
@@ -163,7 +196,7 @@ public:
         RW_REGISTER_7,
         RW_PROGRAM_COUNTER,
         RW_STACK_POINTER,
-        RW_OVERFLOW,
+        RW_EXCESS,
     };
 
 
@@ -178,7 +211,8 @@ public:
      */
     uint16_t sp;
 
-    uint16_t overflow;
+    uint16_t ex;
+    uint16_t ia;
     uint16_t reg[NUM_REGISTERS];
     uint16_t mem[MEMORY_SIZE];
     uint8_t  mem_flags[MEMORY_SIZE];
@@ -208,7 +242,9 @@ public:
     int                 getOperandCycles(uint16_t operand) const;
 
 private:
-    void                processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value);
+    void                processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value, char source);
+    void                doOpcode(uint16_t op, uint16_t a, uint16_t b, uint16_t *bptr, bool *skip_next);
+    void                doOpcodeExt0(uint16_t op, uint16_t a, uint16_t b, uint16_t *aptr);
 
 
 /*---------------------------------------------------------------------------
