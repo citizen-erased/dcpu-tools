@@ -41,6 +41,11 @@ void Debugger::setRegister(uint16_t register, uint16_t value)
 
 }
 
+DCPU16& Debugger::getDCPU()
+{
+    return dcpu;
+}
+
 const DCPU16& Debugger::getDCPU() const
 {
     return dcpu;

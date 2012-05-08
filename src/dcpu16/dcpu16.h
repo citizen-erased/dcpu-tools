@@ -194,8 +194,18 @@ public:
         RW_REGISTER_5,
         RW_REGISTER_6,
         RW_REGISTER_7,
+        RW_REGISTER_PTR_0,
+        RW_REGISTER_PTR_1,
+        RW_REGISTER_PTR_2,
+        RW_REGISTER_PTR_3,
+        RW_REGISTER_PTR_4,
+        RW_REGISTER_PTR_5,
+        RW_REGISTER_PTR_6,
+        RW_REGISTER_PTR_7,
         RW_PROGRAM_COUNTER,
+        RW_PROGRAM_COUNTER_PTR,
         RW_STACK_POINTER,
+        RW_STACK_POINTER_PTR,
         RW_EXCESS,
     };
 

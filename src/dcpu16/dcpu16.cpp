@@ -494,10 +494,16 @@ uint16_t DCPU16::read(uint32_t addr) const
         return mem[addr];
     else if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
         return reg[addr - RW_REGISTER_0];
+    else if(RW_REGISTER_PTR_0 <= addr && addr <= RW_REGISTER_PTR_7)
+        return mem[reg[addr - RW_REGISTER_PTR_0]];
     else if(RW_PROGRAM_COUNTER == addr)
         return pc;
+    else if(RW_PROGRAM_COUNTER_PTR == addr)
+        return mem[pc];
     else if(RW_STACK_POINTER == addr)
         return sp;
+    else if(RW_STACK_POINTER_PTR == addr)
+        return mem[sp];
     else if(RW_EXCESS == addr)
         return ex;
 
@@ -510,10 +516,16 @@ void DCPU16::write(uint32_t addr, uint16_t value)
         mem[addr] = value;
     else if(RW_REGISTER_0 <= addr && addr <= RW_REGISTER_7)
         reg[addr - RW_REGISTER_0] = value;
+    else if(RW_REGISTER_PTR_0 <= addr && addr <= RW_REGISTER_PTR_7)
+        mem[reg[addr - RW_REGISTER_PTR_0]] = value;
     else if(RW_PROGRAM_COUNTER == addr)
         pc = value;
+    else if(RW_PROGRAM_COUNTER_PTR == addr)
+        mem[pc] = value;
     else if(RW_STACK_POINTER == addr)
         sp = value;
+    else if(RW_STACK_POINTER_PTR == addr)
+        mem[sp] = value;
     else if(RW_EXCESS == addr)
         ex = value;
 }

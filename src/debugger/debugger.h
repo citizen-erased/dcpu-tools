@@ -20,6 +20,7 @@ public:
 
     void setRegister(uint16_t register, uint16_t value);
 
+    DCPU16& getDCPU();
     const DCPU16& getDCPU() const;
 
     void pushHistory();

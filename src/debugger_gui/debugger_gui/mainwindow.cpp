@@ -2,24 +2,121 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-class RegisterWidgetItem : public QTableWidgetItem
+class InfoWidgetItem : public QTableWidgetItem
+{
+protected:
+    Debugger *debugger;
+
+public:
+    InfoWidgetItem(Debugger *debugger)
+    {
+        this->debugger = debugger;
+        setWritable(false);
+    }
+
+    virtual void update() {}
+    virtual void onEdit() {}
+
+protected:
+    void setWritable(bool write)
+    {
+        if(write)
+            setFlags(flags() | Qt::ItemIsEditable);
+        else
+            setFlags(flags() & ~Qt::ItemIsEditable);
+    }
+};
+
+class ReadOnlyWidgetItem : public InfoWidgetItem
 {
 public:
     int rw_id;
-    QString name;
 
 public:
-    RegisterWidgetItem(int rw_id)
-    : QTableWidgetItem()
+    ReadOnlyWidgetItem(Debugger *debugger, int rw_id)
+        : InfoWidgetItem(debugger)
     {
         this->rw_id = rw_id;
     }
+
+    virtual void update()
+    {
+        uint16_t value = debugger->getDCPU().read(rw_id);
+        setText(hexstr(value));
+    }
 };
+
+class ReadWriteWidgetItem : public ReadOnlyWidgetItem
+{
+public:
+    ReadWriteWidgetItem(Debugger *debugger, int rw_id)
+        : ReadOnlyWidgetItem(debugger, rw_id)
+    {
+        setWritable(true);
+    }
+
+    void onEdit()
+    {
+        QString str = text();
+        int integer = 0;
+        bool ok = false;
+
+        if(str.startsWith("0b"))
+            integer = str.remove(0, 2).toInt(&ok, 2);
+        else
+            integer = str.toInt(&ok, 0);
+
+        if(ok && 0 <= integer && integer <= 0xFFFF)
+        {
+            debugger->getDCPU().write(rw_id, integer);
+            //print confirmation to gui console box thing
+        }
+        else
+        {
+            //print a warning to gui console box thing
+        }
+    }
+};
+
+class CyclesWidgetItem : public InfoWidgetItem
+{
+public:
+    CyclesWidgetItem(Debugger *debugger)
+        : InfoWidgetItem(debugger)
+    {
+
+    }
+
+    void update()
+    {
+        uint64_t value = debugger->getDCPU().getCycles();
+        setText(QString::number(value));
+    }
+};
+
+class ErrorWidgetItem : public InfoWidgetItem
+{
+public:
+    ErrorWidgetItem(Debugger *debugger)
+        : InfoWidgetItem(debugger)
+    {
+
+    }
+
+    void update()
+    {
+        int err = debugger->getDCPU().getError();
+        setText(debugger->getDCPU().getErrorString(err));
+    }
+};
+
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+    updating_gui = true;
+
     ui->setupUi(this);
 
     connect(&run_timer, SIGNAL(timeout()), this, SLOT(pumpCPU()));
@@ -27,13 +124,31 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->registers_table->setColumnCount(2);
     ui->registers_table->setRowCount(0);
 
-    int rows = 11;
-    const char *names[] = {"A", "B", "C", "I", "J", "K", "X", "Y", "PC", "SP", "Overflow"};
-    for(int row = 0; row < rows; row++)
-        addInfoRow(names[row], DCPU16::RW_REGISTER_0 + row);
+    addInfoRow("A",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_0));
+    addInfoRow("B",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_1));
+    addInfoRow("C",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_2));
+    addInfoRow("I",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_3));
+    addInfoRow("J",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_4));
+    addInfoRow("K",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_5));
+    addInfoRow("X",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_6));
+    addInfoRow("Y",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_7));
+    addInfoRow("PC", new ReadWriteWidgetItem(&debugger, DCPU16::RW_PROGRAM_COUNTER));
+    addInfoRow("SP", new ReadWriteWidgetItem(&debugger, DCPU16::RW_STACK_POINTER));
+    addInfoRow("EX", new ReadWriteWidgetItem(&debugger, DCPU16::RW_EXCESS));
 
-    info_row_cycles = addInfoRow("Cycles", 0);
-    info_row_error  = addInfoRow("Error", 0);
+    addInfoRow("[A]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_0));
+    addInfoRow("[B]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_1));
+    addInfoRow("[C]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_2));
+    addInfoRow("[I]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_3));
+    addInfoRow("[J]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_4));
+    addInfoRow("[K]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_5));
+    addInfoRow("[X]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_6));
+    addInfoRow("[Y]",  new ReadWriteWidgetItem(&debugger, DCPU16::RW_REGISTER_PTR_7));
+    addInfoRow("[PC]", new ReadWriteWidgetItem(&debugger, DCPU16::RW_PROGRAM_COUNTER_PTR));
+    addInfoRow("[SP]", new ReadWriteWidgetItem(&debugger, DCPU16::RW_STACK_POINTER_PTR));
+
+    addInfoRow("Cycles", new CyclesWidgetItem(&debugger));
+    addInfoRow("Error",  new ErrorWidgetItem(&debugger));
 
     ui->splitter->setStretchFactor(0, 30);
     ui->splitter->setStretchFactor(1, 1);
@@ -60,6 +175,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->memory_view->setDebugger(&debugger);
     updateGUI();
+
+    updating_gui = false;
 }
 
 MainWindow::~MainWindow()
@@ -67,38 +184,35 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-int MainWindow::addInfoRow(const char *name, int rw_id)
+int MainWindow::addInfoRow(const char *name, InfoWidgetItem *info_item)
 {
     int row = ui->registers_table->rowCount();
     ui->registers_table->insertRow(row);
 
     QTableWidgetItem *item = new QTableWidgetItem(name);
     item->setFlags(item->flags() & (~Qt::ItemIsEditable));
+
     ui->registers_table->setItem(row, 0, item);
-    ui->registers_table->setItem(row, 1, new RegisterWidgetItem(rw_id));
+    ui->registers_table->setItem(row, 1, info_item);
+
+    info_items.push_back(info_item);
 
     return row;
 }
 
 void MainWindow::updateGUI()
 {
-    for(int row = 0; row < 11; row++) //TODO rows constant
-    {
-        uint16_t value = debugger.getDCPU().read(DCPU16::RW_REGISTER_0 + row);
-        ui->registers_table->item(row, 1)->setText(hexstr(value));
-    }
+    updating_gui = true;
 
-    uint64_t cycles = debugger.getDCPU().getCycles();
-    ui->cycles_label->setText(QString::number(cycles));
-    ui->registers_table->item(info_row_cycles, 1)->setText(QString::number(cycles));
-
-    const char *err_str = debugger.getDCPU().getErrorString(debugger.getDCPU().getError());
-    ui->registers_table->item(info_row_error, 1)->setText(err_str);
+    for(size_t i = 0; i < info_items.size(); i++)
+        info_items[i]->update();
 
     ui->memory_view->updateTexts();
     //TODO only repaint if memory changed.
     //TODO MemoryView should take care of determining if a repaint is necessary when updating texts.
     ui->memory_view->repaint();
+
+    updating_gui = false;
 }
 
 void MainWindow::doStep(int step)
@@ -141,5 +255,14 @@ void MainWindow::pumpCPU()
 void MainWindow::reset()
 {
     debugger.reset();
+    updateGUI();
+}
+
+void MainWindow::cellChanged(int row, int column)
+{
+    if(column ==0 || updating_gui)
+        return;
+
+    static_cast<InfoWidgetItem*>(ui->registers_table->item(row, column))->onEdit();
     updateGUI();
 }

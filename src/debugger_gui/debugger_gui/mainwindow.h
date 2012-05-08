@@ -3,19 +3,24 @@
 
 #include <QMainWindow>
 #include <QTimer>
+#include <vector>
 #include "../../debugger/debugger.h"
 
 namespace Ui {
 class MainWindow;
 }
 
+
+class InfoWidgetItem;
+
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
     
 private:
-    int info_row_cycles;
-    int info_row_error;
+    std::vector<InfoWidgetItem*> info_items;
+    bool updating_gui;
 
 public:
     explicit MainWindow(QWidget *parent = 0);
@@ -24,7 +29,7 @@ public:
 private:
     void doStep(int step);
     void updateGUI();
-    int addInfoRow(const char *name, int rw_id);
+    int addInfoRow(const char *name, InfoWidgetItem *data_item);
 
 private:
     Ui::MainWindow *ui;
@@ -38,6 +43,7 @@ public slots:
     void stepBackward();
     void pumpCPU();
     void reset();
+    void cellChanged(int row, int column);
 };
 
 #endif // MAINWINDOW_H
