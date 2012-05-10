@@ -44,6 +44,8 @@ public slots:
     void pumpCPU();
     void reset();
     void cellChanged(int row, int column);
+
+    void exit();
 };
 
 #endif // MAINWINDOW_H

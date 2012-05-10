@@ -96,17 +96,32 @@ public:
 
 class ErrorWidgetItem : public InfoWidgetItem
 {
+private:
+    QColor no_error_color;
+    QColor error_color;
+
 public:
     ErrorWidgetItem(Debugger *debugger)
         : InfoWidgetItem(debugger)
     {
-
+        no_error_color.setRgb(0xC7FEBE);
+        error_color.setRgb(0xDE6770);
     }
 
     void update()
     {
         int err = debugger->getDCPU().getError();
-        setText(debugger->getDCPU().getErrorString(err));
+        QString err_str = debugger->getDCPU().getErrorString(err);
+
+        if(err_str.startsWith("ERROR_"))
+            err_str.remove(0, 6);
+
+        if(err != DCPU16::ERROR_NONE)
+            setBackgroundColor(error_color);
+        else
+            setBackgroundColor(no_error_color);
+
+        setText(err_str);
     }
 };
 
@@ -265,4 +280,9 @@ void MainWindow::cellChanged(int row, int column)
 
     static_cast<InfoWidgetItem*>(ui->registers_table->item(row, column))->onEdit();
     updateGUI();
+}
+
+void MainWindow::exit()
+{
+    QApplication::quit();
 }
