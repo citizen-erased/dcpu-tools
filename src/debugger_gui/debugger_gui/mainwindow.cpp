@@ -1,3 +1,4 @@
+#include <QFileDialog>
 #include "gui_utils.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -199,6 +200,11 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::open(const QString &path)
+{
+
+}
+
 int MainWindow::addInfoRow(const char *name, InfoWidgetItem *info_item)
 {
     int row = ui->registers_table->rowCount();
@@ -250,16 +256,6 @@ void MainWindow::stopCPU()
     run_timer.stop();
 }
 
-void MainWindow::stepForward()
-{
-    doStep(1);
-}
-
-void MainWindow::stepBackward()
-{
-    doStep(-1);
-}
-
 void MainWindow::pumpCPU()
 {
 //    doStep(1000);
@@ -273,7 +269,20 @@ void MainWindow::reset()
     updateGUI();
 }
 
-void MainWindow::cellChanged(int row, int column)
+void MainWindow::exit()
+{
+    QApplication::quit();
+}
+
+void MainWindow::on_actionOpen_triggered()
+{
+    QString path = QFileDialog::getOpenFileName(this, tr("Open File"));
+
+    if(!path.isNull())
+        open(path);
+}
+
+void MainWindow::on_registers_table_cellChanged(int row, int column)
 {
     if(column ==0 || updating_gui)
         return;
@@ -282,7 +291,10 @@ void MainWindow::cellChanged(int row, int column)
     updateGUI();
 }
 
-void MainWindow::exit()
-{
-    QApplication::quit();
-}
+void MainWindow::on_playButton_clicked()            { runCPU(); }
+void MainWindow::on_stopButton_clicked()            { stopCPU(); }
+void MainWindow::on_stepForwardButton_clicked()     { doStep(1); }
+void MainWindow::on_stepBackwardButton_clicked()    { doStep(-1); }
+void MainWindow::on_actionReset_triggered()         { reset(); }
+void MainWindow::on_actionExit_triggered()          { exit(); }
+

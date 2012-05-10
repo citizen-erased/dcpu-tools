@@ -246,6 +246,9 @@
    <property name="text">
     <string>Open...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
   </action>
   <action name="actionExit">
    <property name="text">
@@ -268,120 +271,7 @@
   </customwidget>
  </customwidgets>
  <resources/>
- <connections>
-  <connection>
-   <sender>actionReset</sender>
-   <signal>activated()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>reset()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>-1</x>
-     <y>-1</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>552</x>
-     <y>417</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>stopButton</sender>
-   <signal>clicked()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>stopCPU()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>124</x>
-     <y>793</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>2</x>
-     <y>210</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>stepBackwardButton</sender>
-   <signal>clicked()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>stepBackward()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>68</x>
-     <y>793</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>5</x>
-     <y>229</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>stepForwardButton</sender>
-   <signal>clicked()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>stepForward()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>236</x>
-     <y>793</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>1</x>
-     <y>247</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>playButton</sender>
-   <signal>clicked()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>runCPU()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>180</x>
-     <y>793</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>0</x>
-     <y>197</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>registers_table</sender>
-   <signal>cellChanged(int,int)</signal>
-   <receiver>MainWindow</receiver>
-   <slot>cellChanged(int,int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>178</x>
-     <y>54</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>268</x>
-     <y>24</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>actionExit</sender>
-   <signal>activated()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>exit()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>-1</x>
-     <y>-1</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>552</x>
-     <y>417</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
  <slots>
   <slot>stepForward()</slot>
   <slot>stepBackward()</slot>
