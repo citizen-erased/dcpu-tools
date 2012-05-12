@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstring>
 #include <algorithm>
 #include <iostream>
@@ -47,6 +48,9 @@ void DCPU16::step()
 {
     if(error)
         return;
+
+    if(interrupt_count > 0)
+        beginInterrupt(interrupt_queue[--interrupt_count]);
 
     InstructionData instruction = nextInstruction();
     last_instruction = instruction;
@@ -106,7 +110,8 @@ void DCPU16::doOpcode(uint16_t op, uint16_t a, uint16_t b, uint16_t *bptr, bool 
         break;
 
     case MLI:
-        //TODO
+        writePtr(bptr, sb * sa);
+        ex = ((b64 * a64) >> 16) & 0xFFFF;
         break;
 
     case DIV:
@@ -123,15 +128,26 @@ void DCPU16::doOpcode(uint16_t op, uint16_t a, uint16_t b, uint16_t *bptr, bool 
         break;
 
     case DVI:
-        //TODO
+        if(a == 0)
+        {
+            writePtr(bptr, 0);
+            ex = 0x0000;
+        }
+        else
+        {
+            int16_t result = sb / sa;
+            result = result > 0 ? result : std::ceil(result);
+            writePtr(bptr, std::ceil(sb / sa));
+            ex = ((b64 << 16) / a64) & 0xFFFF;
+        }
         break;
 
     case MOD:
-            writePtr(bptr, a == 0 ? 0 : b % a);
+        writePtr(bptr, a == 0 ? 0 : b % a);
         break;
 
     case MDI:
-        //TODO
+        writePtr(bptr, a == 0 ? 0 : b - a * (b/a));
         break;
 
     case AND:
@@ -152,7 +168,8 @@ void DCPU16::doOpcode(uint16_t op, uint16_t a, uint16_t b, uint16_t *bptr, bool 
         break;
 
     case ASR:
-        //TODO
+        writePtr(bptr, arithmeticShift(b, a));
+        ex = ((b64 << 16) >> a64) & 0xFFFF;
         break;
 
     case SHL:
@@ -230,7 +247,17 @@ void DCPU16::doOpcodeExt0(uint16_t op, uint16_t a, uint16_t b, uint16_t *aptr)
         break;
 
     case INT:
-        //TODO
+        if(ia != 0 && interrupt_queueing)
+        {
+            if(interrupt_count == MAX_INTERRUPTS)
+                setError(ERROR_INTERRUPT_QUEUE_FULL);
+            else
+                interrupt_queue[interrupt_count++] = a;
+        }
+        else if(ia != 0)
+        {
+            beginInterrupt(a);
+        }
         break;
 
     case IAG:
@@ -242,23 +269,46 @@ void DCPU16::doOpcodeExt0(uint16_t op, uint16_t a, uint16_t b, uint16_t *aptr)
         break;
 
     case RFI:
-        //TODO
+        endInterrupt();
         break;
 
     case IAQ:
-        //TODO
+        interrupt_queueing = a == 0 ? false : true;
         break;
 
     case HWN:
-        //TODO
+        writePtr(aptr, devices.size());
         break;
 
     case HWQ:
         //TODO
+        if(a < devices.size())
+        {
+            uint32_t hid = devices[a].getHardwareID();
+            uint16_t ver = devices[a].getHardwareVersion();
+            uint32_t mid = devices[a].getManufacturerID();
+
+            reg[REG_A] = uint16_t(hid & 0xFFFF);
+            reg[REG_B] = uint16_t((hid >> 16) & 0xFFFF);
+            reg[REG_C] = ver;
+            reg[REG_X] = uint16_t(mid & 0xFFFF);
+            reg[REG_Y] = uint16_t((mid >> 16) & 0xFFFF);
+        }
+        else
+        {
+            // TODO warn a is invalid
+            reg[REG_A] = 0;
+            reg[REG_B] = 0;
+            reg[REG_C] = 0;
+            reg[REG_X] = 0;
+            reg[REG_Y] = 0;
+        }
         break;
 
     case HWI:
-        //TODO
+        if(a < devices.size())
+            devices[a].interrupt();
+        // TODO warn a is invalid
         break;
 
     default:
@@ -266,6 +316,37 @@ void DCPU16::doOpcodeExt0(uint16_t op, uint16_t a, uint16_t b, uint16_t *aptr)
         break;
     }
 }
+
+uint16_t DCPU16::arithmeticShift(uint16_t i, uint16_t s)
+{
+    s = std::max(s, (uint16_t)16);
+    uint16_t r = i >> s;
+
+    if(i & 0x8000) /* MSB is set */
+    {
+        for(int i = 0; i < s; i++)
+            r = r | (1 << (15-i));
+    }
+
+    return r;
+}
+
+void DCPU16::beginInterrupt(uint16_t msg)
+{
+    interrupt_queueing = true;
+    mem[sp--] = pc;
+    mem[sp--] = reg[REG_A];
+    pc = ia;
+    reg[REG_A] = msg;
+}
+
+void DCPU16::endInterrupt()
+{
+    interrupt_queueing = false;
+    pc = mem[sp++];
+    reg[REG_A] = mem[sp++];
+}
+
 
 /*
  * Reads the next instruction, processes its operands, and advances the program
@@ -462,6 +543,21 @@ bool DCPU16::writePtr(uint16_t *ptr, uint16_t value)
     return true;
 }
 
+bool DCPU16::attachDevice(Device device, uint16_t *device_id)
+{
+    if(devices.size() >= MAX_DEVICES)
+        return false;
+
+    devices.push_back(device);
+    *device_id = uint16_t(devices.size() - 1);
+    return true;
+}
+
+void DCPU16::detachAllDevices()
+{
+    devices.clear();
+}
+
 int DCPU16::getError() const
 {
     return error;
@@ -471,10 +567,11 @@ const char* DCPU16::getErrorString(int err) const
 {
     switch(err)
     {
-        case ERROR_NONE:            return "ERROR_NONE";
-        case ERROR_STACK_OVERFLOW:  return "ERROR_STACK_OVERFLOW";
-        case ERROR_STACK_UNDERFLOW: return "ERROR_STACK_UNDERFLOW";
-        case ERROR_OPCODE_INVALID:  return "ERROR_OPCODE_INVALID";
+        case ERROR_NONE:                    return "ERROR_NONE";
+        case ERROR_STACK_OVERFLOW:          return "ERROR_STACK_OVERFLOW";
+        case ERROR_STACK_UNDERFLOW:         return "ERROR_STACK_UNDERFLOW";
+        case ERROR_OPCODE_INVALID:          return "ERROR_OPCODE_INVALID";
+        case ERROR_INTERRUPT_QUEUE_FULL:    return "ERROR_INTERRUPT_QUEUE_FULL";
         default: break;
     }
 
@@ -506,6 +603,8 @@ uint16_t DCPU16::read(uint32_t addr) const
         return mem[sp];
     else if(RW_EXCESS == addr)
         return ex;
+    else if(RW_INTERRUPT_ADDRESS == addr)
+        return ia;
 
     return 0;
 }
@@ -528,6 +627,8 @@ void DCPU16::write(uint32_t addr, uint16_t value)
         mem[sp] = value;
     else if(RW_EXCESS == addr)
         ex = value;
+    else if(RW_INTERRUPT_ADDRESS == addr)
+        ia = value;
 }
 
 const uint16_t* DCPU16::memoryPointer() const

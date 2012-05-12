@@ -7,6 +7,7 @@
 #ifndef DCPU16_H_
 #define DCPU16_H_
 
+#include <vector>
 #include "../library/pstdint.h"
 
 
@@ -55,6 +56,14 @@ struct InstructionData
 
 
     InstructionData();
+};
+
+struct Device
+{
+    uint32_t (*getHardwareID)();
+    uint16_t (*getHardwareVersion)();
+    uint32_t (*getManufacturerID)();
+    void     (*interrupt)();
 };
 
 
@@ -131,6 +140,7 @@ public:
         ERROR_STACK_OVERFLOW,
         ERROR_STACK_UNDERFLOW,
         ERROR_OPCODE_INVALID,
+        ERROR_INTERRUPT_QUEUE_FULL,
     };
 
     enum
@@ -207,6 +217,17 @@ public:
         RW_STACK_POINTER,
         RW_STACK_POINTER_PTR,
         RW_EXCESS,
+        RW_INTERRUPT_ADDRESS,
+    };
+
+    enum
+    {
+        MAX_INTERRUPTS = 256,
+    };
+
+    enum
+    {
+        MAX_DEVICES = 0xFFFF,
     };
 
 
@@ -231,6 +252,12 @@ public:
     int      error;
 
     InstructionData last_instruction;
+
+    bool     interrupt_queueing;
+    uint16_t interrupt_queue[MAX_INTERRUPTS];
+    uint16_t interrupt_count;;
+
+    std::vector<Device> devices;
     
 
 /*---------------------------------------------------------------------------
@@ -255,6 +282,14 @@ private:
     void                processOperand(uint16_t operand, uint16_t **ptr, uint16_t *value, char source);
     void                doOpcode(uint16_t op, uint16_t a, uint16_t b, uint16_t *bptr, bool *skip_next);
     void                doOpcodeExt0(uint16_t op, uint16_t a, uint16_t b, uint16_t *aptr);
+    uint16_t            arithmeticShift(uint16_t i, uint16_t s);
+
+
+/*---------------------------------------------------------------------------
+ * Interrupts 
+ *--------------------------------------------------------------------------*/
+    void                beginInterrupt(uint16_t msg);
+    void                endInterrupt();
 
 
 /*---------------------------------------------------------------------------
@@ -278,6 +313,13 @@ public:
 private:
     bool                writePtr(uint16_t *ptr, uint16_t value);
 
+
+/*---------------------------------------------------------------------------
+ * Hardware Devices
+ *--------------------------------------------------------------------------*/
+public:
+    bool                attachDevice(Device device, uint16_t *devices);
+    void                detachAllDevices();
 
 /*---------------------------------------------------------------------------
  * Error State
